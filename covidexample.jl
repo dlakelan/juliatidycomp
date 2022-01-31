@@ -88,3 +88,13 @@ regresdata = @chain regresdata begin
 end
 
 model = lm(@formula(response ~ logAgepop + StateName + AgeGroup),regresdata)
+
+scatter(coef(model)[2:52],coefnames(model)[2:52],xerror = stderror(model)[2:52] .* 1.96, size=(500,1000), yticks = :all,
+           left_margin= 15Plots.mm,label=false,title="Log Risk Delta by State")
+
+savefig("StateRisks.png")
+
+scatter(coef(model)[53:58],coefnames(model)[53:58],xerror = stderror(model)[53:58] .* 1.96, size=(500,500), yticks = :all,
+           left_margin= 10Plots.mm,right_margin=10Plots.mm,label=false,title="Log Risk Delta by Age")
+
+savefig("AgeRisks.png")
