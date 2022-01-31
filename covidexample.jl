@@ -1,4 +1,4 @@
-using CSV,DataFrames,DataFramesMeta,GLM,Printf,StatsPlots
+using CSV,DataFrames,DataFramesMeta,GLM,Printf,StatsPlots,GLM
 
 function downloadfiles()
     baseurl = Printf.format"https://www2.census.gov/programs-surveys/popest/datasets/2010-2019/counties/asrh/cc-est2019-agesex-%02d.csv"
@@ -45,7 +45,7 @@ covdbyage = CSV.read("data/federalcoviddeathsbycountyage.csv",DataFrame)
 dfj = leftjoin(dfall,covd, on = [:STATE => Symbol("FIPS State"), :COUNTY => Symbol("FIPS County")])
 
 
-print(filter(x->occursin("_TOT",x),names(dfall)))) # for copy and paste
+print(filter(x->occursin("_TOT",x),names(dfall))) # for copy and paste
 print(unique(covdbyage[:,"Age Group"]))
 
 # this table defines which age groups in the covdbyage correspond to which member groups in dfall, we can then join
@@ -58,7 +58,7 @@ jointable = DataFrame(agegroup1 =
 "50-64 years","50-64 years","50-64 years",
 "65-74 years","65-74 years",
 "75-84 years", "75-84 years", 
-"85 years and over"]
+"85 years and over"],
 
 agegroup2 = ["UNDER5_TOT", "AGE513_TOT", "AGE1417_TOT", 
 "AGE1824_TOT", "AGE2529_TOT", 
@@ -69,4 +69,22 @@ agegroup2 = ["UNDER5_TOT", "AGE513_TOT", "AGE1417_TOT",
 "AGE7579_TOT", "AGE8084_TOT", 
 "AGE85PLUS_TOT"])
 
+countypops = @chain groupby(leftjoin(jointable,stack(dfall,Not([:STATE,:COUNTY,:POPESTIMATE])),on= :agegroup2 => :variable), 
+    [:STATE,:COUNTY,:agegroup1,:POPESTIMATE]) begin
+    @combine :pop = sum(:value)
+end
 
+regresdata = leftjoin(covdbyage,countypops,on = [Symbol("FIPS County") => :COUNTY, Symbol("FIPS State") => :STATE, 
+    Symbol("Age Group")=> :agegroup1 ])
+rename!(regresdata,Dict(Symbol("FIPS State")=>:StateCode, Symbol("FIPS County") => :CountyCode, Symbol("Age Group") => :AgeGroup, 
+    Symbol("COVID-19 Deaths")=>:COVIDDeaths))
+
+regresdata = @chain regresdata begin
+    @select(:Year,:Quarter,:StateName = :State, :CountyName = :County, :StateCode, :CountyCode, :AgeGroup, :COVIDDeaths, 
+        :TotalPop = :POPESTIMATE, :AgePop = :pop)
+    @transform(:CovRelDeaths = :COVIDDeaths ./ :TotalPop, :AgeRel = :AgePop ./ :TotalPop)
+    @transform(:response=log.(:CovRelDeaths),:logAgepop = log.(:AgeRel))
+    @subset(.! ismissing.(:response), .! ismissing.(:logAgepop), .! isinf.(:response) )
+end
+
+model = lm(@formula(response ~ logAgepop + StateName + AgeGroup),regresdata)
