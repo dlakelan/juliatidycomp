@@ -31,7 +31,7 @@ function readallcountycsv(files)
 end
 
 dfall = @time readallcountycsv(filter(x -> occursin(r"cc-est",x),readdir("data",join=true)))
-## year == 12 means 7/1/2019 estimate according to census data key
+## year == 12 means 7/1/2019 estimate according to census data key, this is the last available one
 dfall = dfall[dfall.YEAR .== 12,:]
 dfall.YEAR .= 2019;
 covd = CSV.read("data/federalCOVIDdeaths.csv",DataFrame)
@@ -43,4 +43,30 @@ covdbyage = CSV.read("data/federalcoviddeathsbycountyage.csv",DataFrame)
 ## and also for each age group the fraction of the total population in that age group
 
 dfj = leftjoin(dfall,covd, on = [:STATE => Symbol("FIPS State"), :COUNTY => Symbol("FIPS County")])
+
+
+print(filter(x->occursin("_TOT",x),names(dfall)))) # for copy and paste
+print(unique(covdbyage[:,"Age Group"]))
+
+# this table defines which age groups in the covdbyage correspond to which member groups in dfall, we can then join
+# and aggregate by agegroup1 to get the sums
+jointable = DataFrame(agegroup1 = 
+["0-17 years", "0-17 years", "0-17 years", 
+"18-29 years","18-29 years",
+"30-39 years", "30-39 years",
+"40-49 years","40-49 years",
+"50-64 years","50-64 years","50-64 years",
+"65-74 years","65-74 years",
+"75-84 years", "75-84 years", 
+"85 years and over"]
+
+agegroup2 = ["UNDER5_TOT", "AGE513_TOT", "AGE1417_TOT", 
+"AGE1824_TOT", "AGE2529_TOT", 
+"AGE3034_TOT", "AGE3539_TOT", 
+"AGE4044_TOT", "AGE4549_TOT", 
+"AGE5054_TOT", "AGE5559_TOT", "AGE6064_TOT",
+"AGE6569_TOT", "AGE7074_TOT",
+"AGE7579_TOT", "AGE8084_TOT", 
+"AGE85PLUS_TOT"])
+
 
