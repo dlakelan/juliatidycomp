@@ -40,10 +40,6 @@ while (n_active > 0) {
   partdf$E[transfer_to] = partdf$E[transfer_to] + e_to_transfer
   partdf$E[transfer_from] = partdf$E[transfer_from] - e_to_transfer
   
-  
-  partdf$E[]
-  
-  
   partdf$active[!inregion(partdf$x, partdf$y)] = F
   n_active = sum(partdf$active)
 }
