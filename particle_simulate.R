@@ -31,8 +31,8 @@ while (n_active > 0) {
   samp1 = sample(which(partdf$active)) # index of active particles in random order
   samp2 = sample(which(partdf$active))
   rand = runif(n=length(samp1)) 
-  radiate = samp1[rand >= 0.5]  # some particles lose energy by radiation.
-  partdf$E[radiate] = 0.9*partdf$E
+  which_radiate = samp1[rand >= 0.5]  # some particles lose energy by radiation.
+  partdf$E[which_radiate] = 0.9*partdf$E[which_radiate]
   
   transfer_from = samp1[rand < 0.5] # some particles transfer energy to others
   transfer_to = samp2[rand < 0.5]
