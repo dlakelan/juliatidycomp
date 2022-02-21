@@ -44,10 +44,12 @@ while (n_active > 0) {
   n_active = sum(partdf$active)
 }
 
+png("particle_simulate_R.png",width=600,height=1200)
 p1 = ggplot(partdf, aes(x=x,y=y)) + geom_point(aes(color=E))
-p2 = ggplot(partdf) + geom_histogram(aes(x = E )) + scale_x_log10()
+p2 = ggplot(partdf) + geom_histogram(aes(x = log(E)),bins=1000)
 
-grid.arrange(p1, p2, nrow = 1)
+grid.arrange(p1, p2, nrow = 2)
+dev.off()
 
 print(paste("Total energy is", sum(partdf$E)))
 print(paste("99.95 percentile of energy is:", quantile(partdf$E,0.9995)))

@@ -57,6 +57,7 @@ p2 = scatter([(p.x,p.y) for p in parts],alpha=0.05,pointsize=2,marker_z=[log(p.E
     color=colors,label=false,title="Final Position with color from log(E)");
 
 plot(p1,p2,layout=(2,1),size=(400,800))
+savefig("particles.png")
 println("The 99.95% quantile of energy was: $(quantile([p.E for p in parts],.9995))")
 
 
