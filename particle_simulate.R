@@ -7,7 +7,7 @@ return ((x^2+y^2 < 1) | (abs(x) < 0.5 & y > -2.0 & y < 0.0))
 } 
 
 
-N = 1000000
+N = 10000
 
 # Initialize the dataframe
 partdf = data.frame(active = rep(T,N),
@@ -20,28 +20,23 @@ n_count = 0
 
 while (n_active > 0) {
   print(paste(n_active, sum(partdf$E)))
-  # print(n_active)
-  # Move the active particles
-  partdf = partdf %>% 
-    mutate(
-      x = x + active*rnorm(n=N, mean=0, sd=0.1),
-      y = y + active*rnorm(n=N, mean=0, sd=0.1),
-    )
-  
-  samp1 = sample(which(partdf$active)) # index of active particles in random order
-  samp2 = sample(which(partdf$active))
-  rand = runif(n=length(samp1)) 
-  which_radiate = samp1[rand >= 0.5]  # some particles lose energy by radiation.
-  partdf$E[which_radiate] = 0.9*partdf$E[which_radiate]
-  
-  transfer_from = samp1[rand < 0.5] # some particles transfer energy to others
-  transfer_to = samp2[rand < 0.5]
-  e_to_transfer = 0.1*partdf$E[transfer_from]
-  partdf$E[transfer_to] = partdf$E[transfer_to] + e_to_transfer
-  partdf$E[transfer_from] = partdf$E[transfer_from] - e_to_transfer
-  
-  partdf$active[!inregion(partdf$x, partdf$y)] = F
-  n_active = sum(partdf$active)
+  for (i in 1:NROW(partdf)){
+    if (!partdf[i,"active"])
+      next;
+    partdf[i,"x"] = partdf[i,"x"] + rnorm(1,0,0.1)
+    partdf[i,"y"] = partdf[i,"y"] + rnorm(1,0,0.1)    
+    if(runif(1) < 0.5){
+      partdf[i,"E"] = partdf[i,"E"]*0.9
+    }else{
+      ee = partdf[i,"E"] *0.1
+      p = sample(which(partdf$active),1)
+      partdf[p,"E"] = partdf[p,"E"] + ee
+      partdf[i,"E"] = partdf[i,"E"] * 0.9
+    }
+    if (!inregion(partdf[i,"x"],partdf[i,"y"]))
+      partdf[i,"active"] = FALSE
+  }
+  n_active = sum(partdf[,"active"])
 }
 
 png("particle_simulate_R.png",width=600,height=1200)
