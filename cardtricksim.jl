@@ -19,7 +19,7 @@ function couples!(deck)
 end
 
 
-function sim(N,deck)
+function sim!(N,deck)
     successes = 0.0
     for i in 1:N
         successes += couples!(deck)
@@ -31,7 +31,7 @@ function sim(N,deck)
     return (lb = rate - 1.96*se, p = rate, ub=rate+1.96*se)
 end
 
-sim(10,deck)
-@time sim(1_000_000,deck)
+sim!(10,deck)
+@time sim!(1_000_000,deck)
 
 
