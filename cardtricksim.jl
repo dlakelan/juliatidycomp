@@ -1,4 +1,4 @@
-using Random
+using Random, StatsBase
 
 suit = [collect(1:9); [1, 1, 1, 1]]
 deck = repeat(suit,4)
@@ -12,7 +12,7 @@ end
 
 function couples!(deck)
     shuffle!(deck)
-    starts = rand(1:5,2)
+    starts = sample(1:5,2; replace=false)
     end1 = walk(deck,starts[1])
     end2 = walk(deck,starts[2])
     return end1 == end2
