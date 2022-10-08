@@ -34,4 +34,45 @@ end
 sim!(10,deck)
 @time sim!(1_000_000,deck)
 
+@profview sim!(1_000_000,deck)
+
+
+# we can eke out a few percent from cutting the loop short as soon as the 
+# two positions are the same ... but it doesn't help much. Almost all the time is spent
+# in the shuffle! function, and generating random numbers
+function sim2(N)
+    deck = repeat([collect(1:9); [1,1,1,1]],4)
+    successes = 0.0
+    l = length(deck)
+    for i in 1:N
+        shuffle!(deck)
+        pos = sample(1:5,2)
+        end1 = false; end2=false;
+        while pos[1] != pos[2] && (!end1 || !end2)
+            if pos[1] + deck[pos[1]] <= l 
+                pos[1] += deck[pos[1]]
+            else
+               end1 = true
+            end
+            if pos[2] + deck[pos[2]] <= l
+                pos[2] += deck[pos[2]]
+            else
+                end2 = true
+            end
+        end
+        if pos[1] == pos[2]
+            successes += 1.0
+        end
+    end
+    rate = successes / N
+    v = rate * (1.0-rate)*N
+    s = sqrt(v)
+    se = s/N
+    return (lb = rate - 1.96*se, p = rate, ub=rate+1.96*se)
+end
+
+sim2(10)
+@time sim2(10_000_000)
+
+@profview sim2(1_000_000)
 
