@@ -33,8 +33,6 @@ function uninit_array_alloc{T}(len) where {T}
 end
 
 function simulate(N)
-    Random.seed!(111)
-
     local positions = rand(Normal(0, 0.1), N, POSITION_COORDINATES)
     local energies = rand(Exponential(1.0), N)
     # very surprised there's no b-tree for sparse orderable inputs!
