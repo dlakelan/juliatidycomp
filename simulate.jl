@@ -1,19 +1,9 @@
 using DataStructures, Distributions, Random, LinearAlgebra
 
-function msg(s)
-    # println(s)
-end
+const POSITION_COORDINATES = 2
 
-function pr(o)
-    # show(stdout, "text/plain", o)
-    # println()
-end
-
-const POSITION_COORDINATES::UInt = 2
-
-function squash_scratch_space(scratch_matrix::Matrix{T}, remaining_entries::UInt)::Matrix{T} where T
-    # TODO: Julia has no builtin type to codify this expectation!
-    @boundscheck !iszero(remaining_entries)
+function squash_scratch_space(scratch_matrix::Matrix{T}, remaining_entries)::Matrix{T} where T
+    @boundscheck remaining_entries > 0
 
     # If we have fewer active particles than we did last iteration, this will take a contiguous
     # subset of the underlying memory from the start of the allocation region, then reinterpret
@@ -42,16 +32,7 @@ function uninit_array_alloc{T}(len) where {T}
     ret
 end
 
-struct hinted_dict_alloc{K,V}
-end
-function hinted_dict_alloc{K, V}(len) where {K, V}
-    local n::Int = len
-    local ret = Dict{K, V}()
-    sizehint!(ret, n)
-    ret
-end
-
-function simulate(N::UInt)
+function simulate(N)
     Random.seed!(111)
 
     local positions = rand(Normal(0, 0.1), N, POSITION_COORDINATES)
@@ -64,7 +45,7 @@ function simulate(N::UInt)
     local radiated_energy = uninit_array_alloc{Float64}(N)
     local cur_energies = uninit_array_alloc{Float64}(N)
 
-    local radiation_updates = hinted_dict_alloc{UInt, Float64}(N)
+    local radiation_updates::Array{Float64} = zeros(N)
 
     local interaction_targets = uninit_array_alloc{UInt}(N)
 
@@ -81,8 +62,8 @@ function simulate(N::UInt)
         end
 
         # Squash our scratch spaces down to size.
-        cur_positions = squash_scratch_space(cur_positions, convert(UInt, length(cur_indices)))
-        rand_offsets = squash_scratch_space(rand_offsets, convert(UInt, length(cur_indices)))
+        cur_positions = squash_scratch_space(cur_positions, length(cur_indices))
+        rand_offsets = squash_scratch_space(rand_offsets, length(cur_indices))
 
         # Copy the possibly-noncontiguous position data from the main array into our scratch space.
         cur_positions .= positions[cur_indices,:]
@@ -93,14 +74,17 @@ function simulate(N::UInt)
 
         # Radiation targets receive 10% of current energy.
         resize!(radiated_energy, length(cur_indices))
-        radiated_energy .= energies[cur_indices] .* 0.1
-        # local radiated_energy = energies[cur_indices] .* 0.1
+        resize!(cur_energies, length(cur_indices))
+        # Copy over non-contiguous energies from persistent memory.
+        cur_energies .= energies[cur_indices]
+        # In case radiation occurs, record in a separate scratch space for the next step.
+        radiated_energy .= cur_energies .* 0.1
         # Energy decreases by 10% upon each step.
-        energies[cur_indices] .*= 0.9
+        energies[cur_indices] = cur_energies .* 0.9
 
         # Calculate any particle interactions from this iteration.
         local interacts_with = bitrand(length(cur_indices))
-        local radiated_interactions = radiated_energy[interacts_with]
+        local radiated_interactions = @view radiated_energy[interacts_with]
         resize!(interaction_targets, length(radiated_interactions))
         rand!(interaction_targets, cur_indices)
 
@@ -117,48 +101,40 @@ function simulate(N::UInt)
         local in_region = xy_valid .| (x_valid .& y_valid)
 
         # Write our modified position data back to the main array.
-        positions[cur_indices,:] .= cur_positions
+        positions[cur_indices,:] = cur_positions
 
         # Update active particles for next iteration.
         local newly_frozen = cur_indices[.~in_region]
         setdiff!(active, newly_frozen)
 
         # Calculate cumulative radiation interaction updates.
-        empty!(radiation_updates)
-
+        radiation_updates .= 0
         # Coalesce all energy updates over potentially-duplicated targets:
         for (new_energy, cur_target) in zip(radiated_interactions, interaction_targets)
-            get!(radiation_updates, cur_target, 0.0)
+            # get!(radiation_updates, cur_target, 0.0)
             radiation_updates[cur_target] += new_energy
         end
 
-        local shared_targets = Array{UInt}(undef, length(interaction_targets))
-        resize!(shared_targets, 0)
-        local cumulative_new_energies = Array{Float64}(undef, length(interaction_targets))
-        resize!(cumulative_new_energies, 0)
-        for (shared_target, cumulative_new_energy) in radiation_updates
-            push!(shared_targets, shared_target)
-            push!(cumulative_new_energies, cumulative_new_energy)
-        end
-        energies[shared_targets] .+= cumulative_new_energies
+        energies .+= radiation_updates
     end
 
     (positions, energies)
 end
 
 function execute()
-    # positions, energies = @time simulate(1_000_000)
-    local positions, energies = @time simulate(convert(UInt, 1_00))
+    local positions, energies = @time simulate(1_000_000)
+    local log_e = log.(energies)
 
     local colors = cgrad(:thermal)
-    local p1 = histogram(log.(energies), label=false, title="Log(E) at exit")
+    local p1 = histogram(log_e, label=false, title="Log(E) at exit")
     local p2 = scatter(
-        # eachrow(positions),
-        [(r[1], r[2]) for r in eachrow(positions)],
-        # eachrow(positions),
-        marker_z=log.(energies),
+        # NB: for some reason eachrow() alone or even collecting it causes a hang.
+        # collect(eachrow(positions)),
+        [(x, y) for (x,y) in eachrow(positions)],
+        marker_z=log_e,
         alpha=0.05, pointsize=2, color=colors, label=false,
-        title="Final Position with color from log(E)")
+        title="Final Position with color from log(E)",
+    )
 
     plot(
         p1, p2,
